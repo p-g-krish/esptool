@@ -1,0 +1,34 @@
+name: Feature request
+description: Suggest an idea for this project
+labels: ['Type: Feature Request']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        * Search the [open feature requests](https://github.com/espressif/esptool/issues?q=is%3Aissue+is%3Aopen+label%3A%22Type%3A+Feature+Request%22) first and comment on a matching one.
+        * Request one feature per issue.
+        * State only facts you verified.
+        * Paste commands and logs as text, not as screenshots.
+        * Agree on the feature here before you open a pull request.
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: The problem this feature solves and why you need it. Describe your use case.
+      placeholder: ex. I flash 50 boards a day from one PC. esptool flashes one board at a time, so each batch takes an hour.
+    validations:
+      required: true
+  - type: textarea
+    id: goal
+    attributes:
+      label: Goal
+      description: What you want to achieve with the feature. Leave a proposed solution for the Alternatives and Other Information field.
+      placeholder: ex. Flash several boards connected to the same PC with one command.
+    validations:
+      required: true
+  - type: textarea
+    id: more-info
+    attributes:
+      label: Alternatives and Other Information
+      description: A proposed solution, alternatives or workarounds you considered, and any other context.
+      placeholder: ex. Running one esptool process per port works, but the output of the processes is mixed.

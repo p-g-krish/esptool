@@ -1,0 +1,66 @@
+name: Bug report - no ESP chip involved
+description: Report bugs or crashes which don't use any attached hardware
+labels: ['Type: Bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        * Before you open an issue, you must check that the problem still happens with the latest code of the `master` branch on GitHub. If you must stay on an older major version, test its branch instead. For esptool v4.x, this is the `release/v4` branch. [Testing the Latest Code](https://docs.espressif.com/projects/esptool/en/latest/contributing.html#testing-the-latest-code) describes how to install the code of a branch.
+        * Report unrelated problems in separate issues.
+        * State only facts you verified. Only the Cause field can contain a guess.
+        * Paste commands and logs as text, not as screenshots.
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem Description
+      description: What you are trying to do, what happens instead and why it is a problem for you.
+      placeholder: ex. My build script converts the application ELF file to an image. elf2image stops with an error, so the build fails.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behaviour
+      description: What esptool should do instead.
+      placeholder: ex. Generate the image and continue the build.
+    validations:
+      required: true
+  - type: textarea
+    id: cause
+    attributes:
+      label: Cause
+      description: Why the problem happens, if you know. If you have not confirmed it, say that it is a guess.
+      placeholder: ex. My guess is that my custom linker script puts two sections into the same 64 KB flash mapping.
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      description: On which OS does this issue occur?
+      placeholder: ex. macOS 12.1 and Xubuntu 20.04
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Esptool Version
+      description: The output of `esptool version` in the installation where you found the problem. Add the GitHub branch that you tested and the output of `git describe` run in the `esptool` directory that you cloned.
+      placeholder: ex. v5.3.1, and master at v5.4.0-48-g70c1cc3a8
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Command and Output
+      description: The full esptool command line, or the script that calls esptool, and its complete output.
+      placeholder: |
+        $ esptool elf2image esp32-bootloader.elf
+        Paste all lines of output here.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: more-info
+    attributes:
+      label: More Information
+      description: Anything else that helps reproduce or explain the problem, such as other steps to reproduce, setups where the command works, or what you found while investigating.
+      placeholder: ex. The command fails on Windows 11, but the same command works on Ubuntu 24.04.

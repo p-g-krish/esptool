@@ -1,0 +1,90 @@
+name: Issue report - ESP chip operation fails (can't flash, can't connect, etc.)
+description: Report a problem working with attached hardware
+labels: ['Type: Bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        * Most failures to connect or flash are hardware problems. Check the guide that came with your hardware and [the esptool troubleshooting guide](https://docs.espressif.com/projects/esptool/en/latest/troubleshooting.html).
+        * For a custom board, check the [ESP Hardware Design Guidelines](https://docs.espressif.com/projects/esp-hardware-design-guidelines/) and consider the [free-of-charge schematic and PCB review service](https://www.espressif.com/en/contact-us/circuit-schematic-pcb-design-review).
+        * Before you open an issue, you must check that the problem still happens with the latest code of the `master` branch on GitHub. If you must stay on an older major version, test its branch instead. For esptool v4.x, this is the `release/v4` branch. [Testing the Latest Code](https://docs.espressif.com/projects/esptool/en/latest/contributing.html#testing-the-latest-code) describes how to install the code of a branch.
+        * Report unrelated problems in separate issues.
+        * State only facts you verified. Only the Cause field can contain a guess.
+        * Paste commands and logs as text, not as screenshots.
+  - type: textarea
+    id: description
+    attributes:
+      label: Problem Description
+      description: What you are trying to achieve, what happens instead and why it is a problem for you.
+      placeholder: ex. I flash new firmware in production. Every third attempt stops with "Failed to connect", so boards need to be flashed again.
+    validations:
+      required: true
+  - type: textarea
+    id: cause
+    attributes:
+      label: Cause
+      description: Why the problem happens, if you know. If you have not confirmed it, say that it is a guess.
+      placeholder: ex. My guess is that the USB hub drops the connection when the chip resets.
+  - type: input
+    id: os
+    attributes:
+      label: Operating System
+      description: On which OS does this issue occur?
+      placeholder: ex. macOS 12.1 and Xubuntu 20.04
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Esptool Version
+      description: The output of `esptool version` in the installation where you found the problem. Add the GitHub branch that you tested and the output of `git describe` run in the `esptool` directory that you cloned.
+      placeholder: ex. v5.3.1, and master at v5.4.0-48-g70c1cc3a8
+    validations:
+      required: true
+  - type: input
+    id: chip
+    attributes:
+      label: Chip Description
+      description: The ESP chip or module being used.
+      placeholder: ex. ESP8266, ESP32-WROOM32, ESP32-S2 native USB, etc.
+    validations:
+      required: true
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware Description
+      description: The development board or other hardware the chip is attached to, and anything else connected to it. Attach a photo of custom or unusual hardware.
+      placeholder: ex. DevKitC. GPIO 18 and 19 are connected to I2C devices.
+  - type: input
+    id: invocation
+    attributes:
+      label: How is Esptool Run
+      description: Are you running esptool from an IDE such as Arduino or Eclipse?
+      placeholder: ex. No IDE, Windows terminal / Arduino ESP32 IDE v2.5.77
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Command and Output
+      description: The full esptool command line and its complete output. If needed, run esptool with `--trace` for more details.
+      placeholder: |
+        $ esptool -p COM3 write-flash 0x0 bootloader.bin
+        Paste all lines of output here.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: more-info
+    attributes:
+      label: More Information
+      description: Anything else that helps reproduce or explain the problem, such as other steps to reproduce, setups where the command works, or what you found while investigating.
+      placeholder: ex. The same command works every time on a Windows 10 PC.
+  - type: checkboxes
+    id: confirmation
+    attributes:
+      label: I Have Read the Troubleshooting Guide
+      description: You agree to read our [troubleshooting guide](https://docs.espressif.com/projects/esptool/en/latest/troubleshooting.html) before opening a new issue.
+      options:
+        - label: I confirm I have read the troubleshooting guide.
+          required: true

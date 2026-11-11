@@ -1,120 +1,64 @@
-# Gitlab CI config
+---
+# GitLab CI — see .gitlab/README.md
 #
-# Note: When updating, please also update esptool_tests.yml GH Actions workflow file
+# Note: When updating, please also update test_esptool.yml GH Actions workflow file
 stages:
+  - canary_prep
+  - pre-check
+  - check
   - test
   - report
+  - build_docs
+  - deploy_docs
+  - deploy_development_package
+  - canary_post
+default:
+  interruptible: true
+workflow:
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      auto_cancel:
+        on_new_commit: none
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS && $CI_PIPELINE_SOURCE == "push"
+      when: never
+    # Nightly canary schedule — see .gitlab/README.md
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+    - if: $CI_COMMIT_BRANCH
 
-# cache the pip download directory in all jobs
+include:
+  # Danger MR linter, isolated so it can be skipped on bot/sync-master via
+  # include:rules. See .gitlab/README.md (Sync to internal) for why.
+  - local: /.gitlab/danger.yml
+    rules:
+      - if: $CI_COMMIT_REF_NAME != "bot/sync-master"
+  - local: /.gitlab/checks.yml
+  - local: /.gitlab/host_tests.yml
+  - local: /.gitlab/target_tests.yml
+  - local: /.gitlab/deploy_docs.yml
+  - local: /.gitlab/canary.yml
+  - local: /.gitlab/internal_release.yml
+  - local: /.gitlab/sync_to_internal.yml
 variables:
-  PIP_CACHE_DIR: "$CI_PROJECT_DIR/pip-cache"
+  PIP_EXTRA_INDEX_URL: https://dl.espressif.com/pypi
+  PIP_NO_CACHE_DIR: "1"
+  PYTHON_IMAGE_MIN: python:3.10-bookworm
+  PYTHON_IMAGE_LATEST: python:3.15-trixie
+  CANARY_IMAGE: ubuntu:24.04
 
-cache:
-  paths:
-    - "$CI_PROJECT_DIR/pip-cache"
-
-.test_template: &test_template
+# Shared by host_tests_windows and target_tests_windows (see host_tests.yml / target_tests.yml)
+.windows_test:
   stage: test
-  image: $CI_DOCKER_REGISTRY/esp32-ci-env$BOT_DOCKER_IMAGE_TAG
-  tags:
-    - host_test
-  dependencies: []
-
-version_check:
-  <<: *test_template
-  only:
-    - tags
-  script:
-        - VERSION=$(python esptool.py version | head -n 1)
-        - |
-          if [[ "$VERSION" != *"$CI_COMMIT_TAG" ]]
-          then
-            echo "Version number and git tag do not match!"
-            exit 1
-          fi
-
-host_tests:
-  <<: *test_template
-  artifacts:
-    when: always
-    paths:
-      - "**/.coverage*"
-      - ".coverage*"
-    expire_in: 1 week
+  tags: [windows-target]
   variables:
     PYTHONPATH: "$PYTHONPATH:${CI_PROJECT_DIR}/test"
     COVERAGE_PROCESS_START: "${CI_PROJECT_DIR}/test/.covconf"
-  script:
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode ${CI_PROJECT_DIR}/setup.py build
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode ${CI_PROJECT_DIR}/test/test_imagegen.py
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode ${CI_PROJECT_DIR}/test/test_espsecure.py
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode ${CI_PROJECT_DIR}/test/test_merge_bin.py
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode ${CI_PROJECT_DIR}/test/test_espefuse_host.py esp32
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode ${CI_PROJECT_DIR}/test/test_espefuse_host.py esp32s2
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode ${CI_PROJECT_DIR}/test/test_espefuse_host.py esp32s3beta2
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode ${CI_PROJECT_DIR}/test/test_espefuse_host.py esp32s3
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode ${CI_PROJECT_DIR}/test/test_espefuse_host.py esp32c3
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode ${CI_PROJECT_DIR}/test/test_espefuse_host.py esp32h2
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode ${CI_PROJECT_DIR}/test/test_modules.py
-
-check_python_style:
-  <<: *test_template
-  script:
-    # this step installs any 'dev' dependencies (ie flake8) that might be missing in the CI image.
-    # The runner should cache the downloads, so still quite fast.
-    - ./test/ci/multirun_with_pyenv.sh pip install --user -e .[dev]
-    - ./test/ci/multirun_with_pyenv.sh python -m flake8
-
-# Check all the scripts can run when installed under all Python versions
-check_installation_can_run:
-  <<: *test_template
-  artifacts:
-    when: always
-    paths:
-      - "**/.coverage*"
-      - ".coverage*"
-    expire_in: 1 week
-  script:
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode setup.py install
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode esptool.py --help
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode espefuse.py --help
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode espsecure.py --help
-
-# Check the stub can build and that a stub built in CI has the same contents
-# as the one embedded in esptool
-check_stub_build:
-  <<: *test_template
-  artifacts:
-    when: always
-    paths:
-      - flasher_stub/build/
-      - "**/.coverage*"
-      - ".coverage*"
-    expire_in: 1 week
-  variables:
-    # using this directory as the CI image probably already has an ESP32, ESP32S2, ESP32S3 and ESP32C3 toolchain downloaded into here
-    TOOLCHAIN_DIR: "/root/.espressif/dist"
-
-    ESP8266_BINDIR: "${TOOLCHAIN_DIR}/xtensa-lx106-elf/bin"
-    ESP32_BINDIR: "${TOOLCHAIN_DIR}/xtensa-esp32-elf/bin"
-    ESP32S2_BINDIR: "${TOOLCHAIN_DIR}/xtensa-esp32s2-elf/bin"
-    ESP32S3_BINDIR: "${TOOLCHAIN_DIR}/xtensa-esp32s3-elf/bin"
-    ESP32C3_BINDIR: "${TOOLCHAIN_DIR}/riscv32-esp-elf/bin"
-
-    TOOLCHAIN_PATHS: "${ESP8266_BINDIR}:${ESP32_BINDIR}:${ESP32S2_BINDIR}:${ESP32S3_BINDIR}:${ESP32C3_BINDIR}"
-  script:
-    - ./test/ci/setup_ci_build_env.sh
-    - make -C flasher_stub V=1 PATH="${TOOLCHAIN_PATHS}:${PATH}"
-    - cd flasher_stub && ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh -p 3.4.8 coverage run --parallel-mode ./compare_stubs.py
-
-.target_esptool_test:
-  stage: test
-  image: $CI_DOCKER_REGISTRY/rpi-test-env$BOT_DOCKER_IMAGE_TAG
-  variables:
-    PYTHONPATH: "$PYTHONPATH:${CI_PROJECT_DIR}/test"
-    COVERAGE_PROCESS_START: "${CI_PROJECT_DIR}/test/.covconf"
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - when: on_success
   before_script:
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh python -m pip install -e .
+    - pip install -e .[dev] --prefer-binary
   artifacts:
     reports:
       junit: test/report.xml
@@ -125,53 +69,45 @@ check_stub_build:
       - ".coverage*"
     expire_in: 1 week
 
-target_esptool_test_esp32:
-  extends: .target_esptool_test
-  tags:
-    - esptool_esp32_target
-  script:
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode ${CI_PROJECT_DIR}/test/test_esptool.py /dev/serial_ports/ESP32 esp32 115200
-
-target_esptool_test_esp32s2:
-  extends: .target_esptool_test
-  tags:
-    - esptool_esp32s2_target
-  script:
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode ${CI_PROJECT_DIR}/test/test_esptool.py /dev/serial_ports/ESP32S2 esp32s2 115200
-
-target_esptool_test_esp32s2_usbcdc:
-  extends: .target_esptool_test
-  tags:
-    - esptool_esp32s2_cdc_target
-  script:
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode ${CI_PROJECT_DIR}/test/test_esptool.py /dev/serial_ports/ESP32S2_USBCDC esp32s2 115200
-
-target_esptool_test_esp8266:
-  extends: .target_esptool_test
-  tags:
-    - esptool_esp8266_target
-  script:
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh coverage run --parallel-mode ${CI_PROJECT_DIR}/test/test_esptool.py /dev/serial_ports/ESP8266 esp8266 115200
-
-combine_reports:
-  stage: report
+run_pre_commit_hooks:
+  image: $PYTHON_IMAGE_LATEST
+  stage: pre-check
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - when: on_success
+  tags: [host_test]
   before_script:
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh python -m pip install -e .
+    - pip install --upgrade pip
+  script:
+    - pip install -e .[dev] --prefer-binary
+    - pre-commit run --all-files
+combine_reports:
+  image: $PYTHON_IMAGE_MIN
+  stage: report
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: never
+    - when: on_success
+  tags: [host_test]
   artifacts:
     reports:
-      cobertura: cobertura_report.xml
+      coverage_report:
+        coverage_format: cobertura
+        path: cobertura_report.xml
     when: always
-    paths:
-      - ".coverage*"
-      - cobertura_report.xml
-      - ./html_report/
+    paths: [.coverage*, cobertura_report.xml, ./html_report/]
     expire_in: 1 week
+  coverage: /(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/
   variables:
     LC_ALL: C.UTF-8
+    COVERAGE_RCFILE: ${CI_PROJECT_DIR}/test/.covconf
+  before_script: ['pip install -e .[dev] --prefer-binary']
   script:
     # all .coverage files in sub-directories are moved to the parent dir first
-    - find . -mindepth 2 -type f -name ".coverage*" -print -exec mv --backup=numbered {} . \;
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh -p 3.4.8 coverage combine
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh -p 3.4.8 coverage report
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh -p 3.4.8 coverage html -d html_report
-    - ${CI_PROJECT_DIR}/test/ci/multirun_with_pyenv.sh -p 3.4.8 coverage xml -o cobertura_report.xml
+    - find . -mindepth 2 -type f -name ".coverage*" -print -exec mv --backup=numbered
+      {} . \;
+    - coverage combine
+    - coverage report --precision=2
+    - coverage html -d html_report --precision=2
+    - coverage xml -o cobertura_report.xml
